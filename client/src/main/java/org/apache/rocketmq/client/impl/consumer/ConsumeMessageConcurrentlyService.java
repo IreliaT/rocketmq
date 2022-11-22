@@ -194,16 +194,18 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
         final ProcessQueue processQueue,
         final MessageQueue messageQueue,
         final boolean dispatchToConsume) {
+
         final int consumeBatchSize = this.defaultMQPushConsumer.getConsumeMessageBatchMaxSize();
         if (msgs.size() <= consumeBatchSize) {
             ConsumeRequest consumeRequest = new ConsumeRequest(msgs, processQueue, messageQueue);
-            try {
-                this.consumeExecutor.submit(consumeRequest);
+            try {// 小于 32条，
+                this.consumeExecutor.submit(consumeRequest);//这是把消息提交到消费者线程池
             } catch (RejectedExecutionException e) {
+                //如果提交出现异常，会等5秒后再次提交
                 this.submitConsumeRequestLater(consumeRequest);
             }
         } else {
-            for (int total = 0; total < msgs.size(); ) {
+            for (int total = 0; total < msgs.size(); ) {//拆分
                 List<MessageExt> msgThis = new ArrayList<MessageExt>(consumeBatchSize);
                 for (int i = 0; i < consumeBatchSize; i++, total++) {
                     if (total < msgs.size()) {
@@ -215,12 +217,11 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
 
                 ConsumeRequest consumeRequest = new ConsumeRequest(msgThis, processQueue, messageQueue);
                 try {
-                    this.consumeExecutor.submit(consumeRequest);
-                } catch (RejectedExecutionException e) {
+                    this.consumeExecutor.submit(consumeRequest);//提交
+                } catch (RejectedExecutionException e) {//出现异常，重新丢回去list，然后等5秒继续提交
                     for (; total < msgs.size(); total++) {
                         msgThis.add(msgs.get(total));
                     }
-
                     this.submitConsumeRequestLater(consumeRequest);
                 }
             }
@@ -274,13 +275,13 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
         }
 
         switch (this.defaultMQPushConsumer.getMessageModel()) {
-            case BROADCASTING:
+            case BROADCASTING://广播模式则不管
                 for (int i = ackIndex + 1; i < consumeRequest.getMsgs().size(); i++) {
                     MessageExt msg = consumeRequest.getMsgs().get(i);
                     log.warn("BROADCASTING, the message consume failed, drop it, {}", msg.toString());
                 }
                 break;
-            case CLUSTERING:
+            case CLUSTERING://集群模式则会去重新则直接将本批ACK消费发送失败的消息再次封 装为ConsumeRequest，然后延迟5s重新消费
                 List<MessageExt> msgBackFailed = new ArrayList<MessageExt>(consumeRequest.getMsgs().size());
                 for (int i = ackIndex + 1; i < consumeRequest.getMsgs().size(); i++) {
                     MessageExt msg = consumeRequest.getMsgs().get(i);
@@ -374,6 +375,7 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
 
         @Override
         public void run() {
+            //检查这个消费者快照是否被删除，因为一个队列只能被一个消费者消费
             if (this.processQueue.isDropped()) {
                 log.info("the message queue not be able to consume, because it's dropped. group={} {}", ConsumeMessageConcurrentlyService.this.consumerGroup, this.messageQueue);
                 return;

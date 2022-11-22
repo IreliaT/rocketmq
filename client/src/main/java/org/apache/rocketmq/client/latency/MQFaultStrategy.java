@@ -56,34 +56,37 @@ public class MQFaultStrategy {
     }
 
     public MessageQueue selectOneMessageQueue(final TopicPublishInfo tpInfo, final String lastBrokerName) {
-        if (this.sendLatencyFaultEnable) {
+        if (this.sendLatencyFaultEnable) {//sendLatencyFaultEnable  这个就是Broker故障规避机制，默认不开启
             try {
                 int index = tpInfo.getSendWhichQueue().incrementAndGet();
+                //这个for 就是排除故障的queue
                 for (int i = 0; i < tpInfo.getMessageQueueList().size(); i++) {
                     int pos = Math.abs(index++) % tpInfo.getMessageQueueList().size();
                     if (pos < 0)
                         pos = 0;
                     MessageQueue mq = tpInfo.getMessageQueueList().get(pos);
+                    //latencyFaultTolerance.isAvailable() 这个方法就是判断这个broker是否故障
                     if (latencyFaultTolerance.isAvailable(mq.getBrokerName()))
                         return mq;
                 }
-
+                //如果所有的broker都有故障，就走到这里
+                //就算所有的都坏了，也得选一个，至少选一个
                 final String notBestBroker = latencyFaultTolerance.pickOneAtLeast();
                 int writeQueueNums = tpInfo.getQueueIdByBroker(notBestBroker);
-                if (writeQueueNums > 0) {
+                if (writeQueueNums > 0) {//如果写queue大于0，就在个broker中选一个queue
                     final MessageQueue mq = tpInfo.selectOneMessageQueue();
                     if (notBestBroker != null) {
                         mq.setBrokerName(notBestBroker);
                         mq.setQueueId(tpInfo.getSendWhichQueue().incrementAndGet() % writeQueueNums);
                     }
                     return mq;
-                } else {
+                } else {//如果这个broker没有writeQueue，就从这个里面删了
                     latencyFaultTolerance.remove(notBestBroker);
                 }
             } catch (Exception e) {
                 log.error("Error occurred when selecting message queue", e);
             }
-
+            //这里是兜底选择的，就是说无论如何，都要发到broker去
             return tpInfo.selectOneMessageQueue();
         }
 

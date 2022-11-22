@@ -33,9 +33,9 @@ public interface ConsumeMessageService {
     void decCorePoolSize();
 
     int getCorePoolSize();
-
+    //直接消费消息
     ConsumeMessageDirectlyResult consumeMessageDirectly(final MessageExt msg, final String brokerName);
-
+    //提交消息消费。
     void submitConsumeRequest(
         final List<MessageExt> msgs,
         final ProcessQueue processQueue,

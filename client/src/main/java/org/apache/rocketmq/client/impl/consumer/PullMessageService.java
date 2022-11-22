@@ -122,11 +122,13 @@ public class PullMessageService extends ServiceThread {
     @Override
     public void run() {
         log.info(this.getServiceName() + " service started");
-
+        //这个设计技巧，就是把这个字段用 volatile来修饰，每次运行检查状态，可以通过其他线程修改这个变量来实现停止拉取
+        // 因为volatile变量在写入之后，会直接刷到主内存，其他线程的本地内存会失效，然后去主内存取，因为volatile保证可见性，如果不加，可能其他线程改了，你这还没读到
         while (!this.isStopped()) {
             try {
+                //阻塞队列， take（） 如果没有数据，线程阻塞
                 MessageRequest messageRequest = this.messageRequestQueue.take();
-                if (messageRequest.getMessageRequestMode() == MessageRequestMode.POP) {
+                if (messageRequest.getMessageRequestMode() == MessageRequestMode.POP) {//判断是推送 还是拉取模式
                     this.popMessage((PopRequest)messageRequest);
                 } else {
                     this.pullMessage((PullRequest)messageRequest);

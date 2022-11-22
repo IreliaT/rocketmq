@@ -30,6 +30,12 @@ public class MessageSysFlag {
      * | byte 3 |   |   |           |          |             |                  |                  |                  |
      * | byte 4 |   |   |           |          |             |                  |                  |                  |
      */
+    public static void main(String[] args) {
+        System.out.println(0x1 << 1);
+        System.out.println(0x2 << 2);
+        System.out.println(0x3 << 8);
+        System.out.println(0x7 << 8);
+    }
     public final static int COMPRESSED_FLAG = 0x1;
     public final static int MULTI_TAGS_FLAG = 0x1 << 1;
     public final static int TRANSACTION_NOT_TYPE = 0;

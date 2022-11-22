@@ -1013,9 +1013,11 @@ public class CommitLog implements Swappable {
                 // global
                 messageExtBatch.setStoreTimestamp(beginLockTimestamp);
 
+                //等于null的情况，表示/store/commitlog目录下不存在任何文件，会把文件命名为00000000000000000000
                 if (null == mappedFile || mappedFile.isFull()) {
                     mappedFile = this.mappedFileQueue.getLastMappedFile(0); // Mark: NewFile may be cause noise
                 }
+                //这里如果失败，可能是磁盘不足
                 if (null == mappedFile) {
                     log.error("Create mapped file1 error, topic: {} clientAddr: {}", messageExtBatch.getTopic(), messageExtBatch.getBornHostString());
                     beginTimeInLock = 0;
