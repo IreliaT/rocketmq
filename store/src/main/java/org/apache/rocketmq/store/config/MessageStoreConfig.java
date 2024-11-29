@@ -29,7 +29,7 @@ public class MessageStoreConfig {
 
     //The root directory in which the log data is kept
     @ImportantField
-    private String storePathRootDir = System.getProperty("user.home") + File.separator + "store";
+    private String storePathRootDir = "D:\\rocketmq" + File.separator + "store";
 
     //The directory in which the commitlog is kept
     @ImportantField

@@ -137,10 +137,13 @@ public class MQFaultStrategy {
     public MessageQueue selectOneMessageQueue(final TopicPublishInfo tpInfo, final String lastBrokerName, final boolean resetIndex) {
         BrokerFilter brokerFilter = threadBrokerFilter.get();
         brokerFilter.setLastBrokerName(lastBrokerName);
+        // sendLatencyFaultEnable  避障参数, 开启了之后,如果给这个broker发送消息失败,就会记录下来，下次不往这个发
+        // 默认为false，不开窍
         if (this.sendLatencyFaultEnable) {
             if (resetIndex) {
                 tpInfo.resetIndex();
             }
+            // 判断该队列是否可用
             MessageQueue mq = tpInfo.selectOneMessageQueue(availableFilter, brokerFilter);
             if (mq != null) {
                 return mq;

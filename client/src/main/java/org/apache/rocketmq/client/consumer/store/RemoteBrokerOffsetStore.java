@@ -58,6 +58,10 @@ public class RemoteBrokerOffsetStore implements OffsetStore {
     @Override
     public void updateOffset(MessageQueue mq, long offset, boolean increaseOnly) {
         if (mq != null) {
+            /**
+             * 是将消费过的消息的offset(递增）更新到消费者本地offset变量表中。
+             * 然后通过定时任务持久化到broker中。
+             */
             ControllableOffset offsetOld = this.offsetTable.get(mq);
             if (null == offsetOld) {
                 offsetOld = this.offsetTable.putIfAbsent(mq, new ControllableOffset(offset));

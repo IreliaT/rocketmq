@@ -121,9 +121,9 @@ public class DefaultMessageStore implements MessageStore {
 
     public final PerfCounter.Ticks perfs = new PerfCounter.Ticks(LOGGER);
 
-    private final MessageStoreConfig messageStoreConfig;
+    private final MessageStoreConfig messageStoreConfig;//消息配置属性
     // CommitLog
-    protected final CommitLog commitLog;
+    protected final CommitLog commitLog; //CommitLog文件存储的实现类
 
     protected final ConsumeQueueStoreInterface consumeQueueStore;
 
@@ -135,7 +135,7 @@ public class DefaultMessageStore implements MessageStore {
 
     private final CorrectLogicOffsetService correctLogicOffsetService;
 
-    protected final IndexService indexService;
+    protected final IndexService indexService; //索引实现类
 
     private final AllocateMappedFileService allocateMappedFileService;
 

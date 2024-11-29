@@ -205,6 +205,7 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
         prepareSharableHandlers();
 
         serverBootstrap.group(this.eventLoopGroupBoss, this.eventLoopGroupSelector)
+                // linux 使用epoll
             .channel(useEpoll() ? EpollServerSocketChannel.class : NioServerSocketChannel.class)
             .option(ChannelOption.SO_BACKLOG, 1024)
             .option(ChannelOption.SO_REUSEADDR, true)

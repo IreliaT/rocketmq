@@ -244,11 +244,19 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
         final ConsumeConcurrentlyContext context,
         final ConsumeRequest consumeRequest
     ) {
+        // 获取ACK的index值  Integer.MAX_VALUE
         int ackIndex = context.getAckIndex();
 
         if (consumeRequest.getMsgs().isEmpty())
             return;
 
+        /**
+         * 根据消息监听器返回的结果计算ackIndex，如果返回
+         * CONSUME_SUCCESS，则将ackIndex设置为msgs.size()-1，如果返回
+         *
+         * RECONSUME_LATER，则将ackIndex设置为-1，这是为下文发送msg
+         * back（ACK）消息做的准备
+         */
         switch (status) {
             case CONSUME_SUCCESS:
                 if (ackIndex >= consumeRequest.getMsgs().size()) {
@@ -256,7 +264,9 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
                 }
                 int ok = ackIndex + 1;
                 int failed = consumeRequest.getMsgs().size() - ok;
+                // 设置成功条数
                 this.getConsumerStatsManager().incConsumeOKTPS(consumerGroup, consumeRequest.getMessageQueue().getTopic(), ok);
+                //设置失败条数
                 this.getConsumerStatsManager().incConsumeFailedTPS(consumerGroup, consumeRequest.getMessageQueue().getTopic(), failed);
                 break;
             case RECONSUME_LATER:
@@ -268,6 +278,20 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
                 break;
         }
 
+
+        /**
+         * 如果是广播模式，业务方会返回RECONSUME_LATER，消息
+         * 并不会被重新消费，而是以警告级别输出到日志文件中。
+         *
+         *
+         * 如果是集群模式，消息消费成功，因为ackIndex=
+         * consumeRequest.getMsgs().size()-1，所以i=ackIndex+1等于
+         * consumeRequest.getMsgs().size()，并不会执行sendMessageBack。
+         * 只有在业务方返回RECONSUME_LATER时，该批消息都需要发送ACK消
+         * 息，如果消息发送失败，则直接将本批ACK消费发送失败的消息再次封
+         * 装为ConsumeRequest，然后延迟5s重新消费。如果ACK消息发送成功，
+         * 则该消息会延迟消费
+         */
         switch (this.defaultMQPushConsumer.getMessageModel()) {
             case BROADCASTING:
                 for (int i = ackIndex + 1; i < consumeRequest.getMsgs().size(); i++) {
@@ -280,12 +304,15 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
                 for (int i = ackIndex + 1; i < consumeRequest.getMsgs().size(); i++) {
                     MessageExt msg = consumeRequest.getMsgs().get(i);
                     // Maybe message is expired and cleaned, just ignore it.
+
+                    //当前这批消息都ACK成功，就跳出，不执行下面的sendMessageBack
                     if (!consumeRequest.getProcessQueue().containsMessage(msg)) {
                         log.info("Message is not found in its process queue; skip send-back-procedure, topic={}, "
                                 + "brokerName={}, queueId={}, queueOffset={}", msg.getTopic(), msg.getBrokerName(),
                             msg.getQueueId(), msg.getQueueOffset());
                         continue;
                     }
+                    // todo 发回到broker
                     boolean result = this.sendMessageBack(msg, context);
                     if (!result) {
                         msg.setReconsumeTimes(msg.getReconsumeTimes() + 1);
@@ -302,9 +329,16 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
             default:
                 break;
         }
-
+        /**
+         * 从ProcessQueue中移除这批消息，这里返回的偏移量是移除该批消息后最小的偏移量。
+         *
+         * 更新Offset，Broker会有个定时任务去持久化offset
+         *
+         * 然后用该偏移量更新消息消费进度，以便消费者重启后能从上一次的消费进度开始消费，避免消息重复消费。
+         */
         long offset = consumeRequest.getProcessQueue().removeMessage(consumeRequest.getMsgs());
         if (offset >= 0 && !consumeRequest.getProcessQueue().isDropped()) {
+            //updateOffset 有两个实现类，广播和集群
             this.defaultMQPushConsumerImpl.getOffsetStore().updateOffset(consumeRequest.getMessageQueue(), offset, true);
         }
     }

@@ -206,6 +206,11 @@ public class ProcessQueue {
                     }
 
                     if (!msgTreeMap.isEmpty()) {
+                        //
+                        /**
+                         * 返回Map中最小的元素，key的位位置， 提交最小点位
+                         * 符合第一条的设计原理，可以重复，不接受丢失
+                         */
                         result = msgTreeMap.firstKey();
                     }
                 }
